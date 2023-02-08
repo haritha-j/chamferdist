@@ -28,6 +28,7 @@ class ChamferDistance(torch.nn.Module):
         bidirectional: Optional[bool] = False,
         reverse: Optional[bool] = False,
         reduction: Optional[str] = "mean",
+        alpha: Optional[float] = 1.0,
     ):
 
         if not isinstance(source_cloud, torch.Tensor):
@@ -113,7 +114,7 @@ class ChamferDistance(torch.nn.Module):
                 chamfer_backward = chamfer_backward.mean()  # (1,)
 
         if bidirectional:
-            return chamfer_forward + chamfer_backward
+            return chamfer_forward + (alpha * chamfer_backward)
         if reverse:
             return chamfer_backward
 
