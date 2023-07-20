@@ -28,6 +28,9 @@ class ChamferDistance(torch.nn.Module):
         bidirectional: Optional[bool] = False,
         reverse: Optional[bool] = False,
         reduction: Optional[str] = "mean",
+        alpha: Optional[float] = 1.0,
+        robust: Optional[str] = None,
+        delta: Optional[float] = 1.0
     ):
 
         if not isinstance(source_cloud, torch.Tensor):
@@ -71,8 +74,8 @@ class ChamferDistance(torch.nn.Module):
                 "Both bidirectional and reverse set to True. "
                 "bidirectional behavior takes precedence."
             )
-        if reduction != "sum" and reduction != "mean":
-            raise ValueError('Reduction must either be "sum" or "mean".')
+        if reduction != "sum" and reduction != "mean" and reduction != None:
+            raise ValueError('Reduction must either be "sum" or "mean" or None.')
 
         source_nn = knn_points(
             source_cloud,
@@ -95,9 +98,29 @@ class ChamferDistance(torch.nn.Module):
         # Forward Chamfer distance (batchsize_source, lengths_source)
         chamfer_forward = source_nn.dists[..., 0]
         chamfer_backward = None
+                
         if reverse or bidirectional:
             # Backward Chamfer distance (batchsize_source, lengths_source)
             chamfer_backward = target_nn.dists[..., 0]
+
+        # use a lorentzian / Huber kernel to ensure robustness
+        if robust == "lorentzian":
+            ones_fw = torch.ones(chamfer_forward.shape).cuda()
+            chamfer_forward = torch.log(torch.div(torch.square(chamfer_forward), delta) + ones_fw)
+            
+            if reverse or bidirectional:
+                ones_bw = torch.ones(chamfer_backward.shape).cuda()
+                chamfer_backward = torch.log(torch.div(torch.square(chamfer_backward), delta) + ones_bw)
+                
+        elif robust == "huber":
+            chamfer_forward_a = torch.square(chamfer_forward)
+            chamfer_forward_b = torch.mul(torch.abs(chamfer_forward), 2*delta) - torch.full(chamfer_forward.shape, delta**2).cuda()
+            chamfer_forward = torch.where(chamfer_forward < delta, chamfer_forward_a, chamfer_forward_b)
+            
+            if reverse or bidirectional:
+                chamfer_backward_a = torch.square(chamfer_backward)
+                chamfer_backward_b = torch.mul(torch.abs(chamfer_backward), 2*delta) - torch.full(chamfer_backward.shape, delta**2).cuda()
+                chamfer_backward = torch.where(chamfer_backward < delta, chamfer_backward_a, chamfer_backward_b)
 
         chamfer_forward = chamfer_forward.sum(1)  # (batchsize_source,)
         if reverse or bidirectional:
@@ -113,7 +136,7 @@ class ChamferDistance(torch.nn.Module):
                 chamfer_backward = chamfer_backward.mean()  # (1,)
 
         if bidirectional:
-            return chamfer_forward + chamfer_backward
+            return chamfer_forward + (alpha * chamfer_backward)
         if reverse:
             return chamfer_backward
 
