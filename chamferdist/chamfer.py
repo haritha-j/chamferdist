@@ -30,7 +30,8 @@ class ChamferDistance(torch.nn.Module):
         reduction: Optional[str] = "mean",
         alpha: Optional[float] = 1.0,
         robust: Optional[str] = None,
-        delta: Optional[float] = 1.0
+        delta: Optional[float] = 1.0,
+        bidirectional_robust: Optional[bool] = True
     ):
 
         if not isinstance(source_cloud, torch.Tensor):
@@ -98,7 +99,7 @@ class ChamferDistance(torch.nn.Module):
         # Forward Chamfer distance (batchsize_source, lengths_source)
         chamfer_forward = source_nn.dists[..., 0]
         chamfer_backward = None
-                
+
         if reverse or bidirectional:
             # Backward Chamfer distance (batchsize_source, lengths_source)
             chamfer_backward = target_nn.dists[..., 0]
@@ -107,20 +108,31 @@ class ChamferDistance(torch.nn.Module):
         if robust == "lorentzian":
             ones_fw = torch.ones(chamfer_forward.shape).cuda()
             chamfer_forward = torch.log(torch.div(torch.square(chamfer_forward), delta) + ones_fw)
-            
-            if reverse or bidirectional:
+
+            if (reverse or bidirectional) and bidirectional_robust:
                 ones_bw = torch.ones(chamfer_backward.shape).cuda()
                 chamfer_backward = torch.log(torch.div(torch.square(chamfer_backward), delta) + ones_bw)
-                
+
         elif robust == "huber":
             chamfer_forward_a = torch.square(chamfer_forward)
             chamfer_forward_b = torch.mul(torch.abs(chamfer_forward), 2*delta) - torch.full(chamfer_forward.shape, delta**2).cuda()
             chamfer_forward = torch.where(chamfer_forward < delta, chamfer_forward_a, chamfer_forward_b)
-            
-            if reverse or bidirectional:
+
+            if (reverse or bidirectional) and bidirectional_robust:
                 chamfer_backward_a = torch.square(chamfer_backward)
                 chamfer_backward_b = torch.mul(torch.abs(chamfer_backward), 2*delta) - torch.full(chamfer_backward.shape, delta**2).cuda()
                 chamfer_backward = torch.where(chamfer_backward < delta, chamfer_backward_a, chamfer_backward_b)
+
+        elif robust == "winsor":
+            
+            chamfer_forward_b = torch.zeros(size=chamfer_forward.shape).cuda()
+            chamfer_forward = torch.where(chamfer_forward < delta, chamfer_forward, chamfer_forward_b)
+            print("fw", torch.count_nonzero(chamfer_forward)/(chamfer_forward.shape[0]*chamfer_forward.shape[1]))
+
+            if (reverse or bidirectional) and bidirectional_robust:
+                chamfer_backward_b = torch.zeros(size=chamfer_backward.shape).cuda()
+                chamfer_backward = torch.where(chamfer_backward < delta, chamfer_backward, chamfer_backward_b)           
+                print("bw", torch.count_nonzero(chamfer_backward)/(chamfer_backward.shape[0]*chamfer_backward.shape[1]))
 
         chamfer_forward = chamfer_forward.sum(1)  # (batchsize_source,)
         if reverse or bidirectional:
