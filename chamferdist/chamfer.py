@@ -26,6 +26,7 @@ class ChamferDistance(torch.nn.Module):
         source_cloud: torch.Tensor,
         target_cloud: torch.Tensor,
         bidirectional: Optional[bool] = False,
+        separate_directions: Optional[bool] = False,
         reverse: Optional[bool] = False,
         reduction: Optional[str] = "mean",
         alpha: Optional[float] = 1.0,
@@ -134,10 +135,12 @@ class ChamferDistance(torch.nn.Module):
                 chamfer_backward = torch.where(chamfer_backward < delta, chamfer_backward, chamfer_backward_b)           
                 print("bw", torch.count_nonzero(chamfer_backward)/(chamfer_backward.shape[0]*chamfer_backward.shape[1]))
 
+        # Sum over points
         chamfer_forward = chamfer_forward.sum(1)  # (batchsize_source,)
         if reverse or bidirectional:
             chamfer_backward = chamfer_backward.sum(1)  # (batchsize_target,)
 
+        # reduce over batch
         if reduction == "sum":
             chamfer_forward = chamfer_forward.sum()  # (1,)
             if reverse or bidirectional:
@@ -148,7 +151,10 @@ class ChamferDistance(torch.nn.Module):
                 chamfer_backward = chamfer_backward.mean()  # (1,)
 
         if bidirectional:
-            return chamfer_forward + (alpha * chamfer_backward)
+            if separate_directions:
+                return chamfer_forward, chamfer_backward
+            else:
+                return chamfer_forward + (alpha * chamfer_backward)
         if reverse:
             return chamfer_backward
 
