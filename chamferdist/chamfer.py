@@ -32,7 +32,8 @@ class ChamferDistance(torch.nn.Module):
         alpha: Optional[float] = 1.0,
         robust: Optional[str] = None,
         delta: Optional[float] = 1.0,
-        bidirectional_robust: Optional[bool] = True
+        bidirectional_robust: Optional[bool] = True,
+        return_nn = False
     ):
 
         if not isinstance(source_cloud, torch.Tensor):
@@ -85,6 +86,7 @@ class ChamferDistance(torch.nn.Module):
             lengths1=lengths_source,
             lengths2=lengths_target,
             K=1,
+            return_nn=return_nn
         )
 
         target_nn = None
@@ -95,8 +97,12 @@ class ChamferDistance(torch.nn.Module):
                 lengths1=lengths_target,
                 lengths2=lengths_source,
                 K=1,
+                return_nn=return_nn
             )
 
+        if return_nn:
+            return source_nn, target_nn
+        
         # Forward Chamfer distance (batchsize_source, lengths_source)
         chamfer_forward = source_nn.dists[..., 0]
         chamfer_backward = None
@@ -125,7 +131,6 @@ class ChamferDistance(torch.nn.Module):
                 chamfer_backward = torch.where(chamfer_backward < delta, chamfer_backward_a, chamfer_backward_b)
 
         elif robust == "winsor":
-            
             chamfer_forward_b = torch.zeros(size=chamfer_forward.shape).cuda()
             chamfer_forward = torch.where(chamfer_forward < delta, chamfer_forward, chamfer_forward_b)
             print("fw", torch.count_nonzero(chamfer_forward)/(chamfer_forward.shape[0]*chamfer_forward.shape[1]))
