@@ -33,7 +33,8 @@ class ChamferDistance(torch.nn.Module):
         robust: Optional[str] = None,
         delta: Optional[float] = 1.0,
         bidirectional_robust: Optional[bool] = True,
-        return_nn = False
+        return_nn: Optional[bool]  = False,
+        k: Optional[int] = 1
     ):
 
         if not isinstance(source_cloud, torch.Tensor):
@@ -85,7 +86,7 @@ class ChamferDistance(torch.nn.Module):
             target_cloud,
             lengths1=lengths_source,
             lengths2=lengths_target,
-            K=1,
+            K=k,
             return_nn=return_nn
         )
 
@@ -96,13 +97,13 @@ class ChamferDistance(torch.nn.Module):
                 source_cloud,
                 lengths1=lengths_target,
                 lengths2=lengths_source,
-                K=1,
+                K=k,
                 return_nn=return_nn
             )
 
         if return_nn:
             return source_nn, target_nn
-        
+
         # Forward Chamfer distance (batchsize_source, lengths_source)
         chamfer_forward = source_nn.dists[..., 0]
         chamfer_backward = None

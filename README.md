@@ -1,10 +1,18 @@
 # chamferdist: PyTorch Chamfer distance
 
-> **NOTE**: This implementation was stolen from the [pytorch3d](https://github.com/facebookresearch/pytorch3d) repo, and all I did was to simply repackage it.
+> **NOTE**: This implementation was stolen from the [pytorch3d](https://github.com/facebookresearch/pytorch3d) repo
 
 [![krrish94](https://circleci.com/gh/krrish94/chamferdist.svg?style=svg)](<https://app.circleci.com/pipelines/github/krrish94/chamferdist>)
 
 A simple example Pytorch module to compute Chamfer distance between two pointclouds.
+
+### Additional features over vanilla pytorch3d Chamfer loss
+
+- support for robust kernels
+- support for multi neighbour losses
+
+
+
 
 ### Installation
 
